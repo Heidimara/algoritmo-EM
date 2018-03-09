@@ -26,59 +26,81 @@ x=allelesub = load("alleleSub.rda")  # importar o banco de dados
 fitEM = function(M, S, pis0=rep(1/3, 3),
                  coefs=cbind(c(-1.37,-0.32,1.84), c(0.62, 0.034,-0.62)),
                  dp=c(1,1,1),
-                 maxit=100){
-  erro = 1
+                 maxit=1000){
+  llvelho=-Inf
   it=1
-  while (erro > 1e-6 & it<=maxit){
-print(it)            ### ver o número de interações
+  mudanca=1
+  while (mudanca > 1e-6 & it<=maxit){
+    print(it)            ### ver o nÃºmero de interaÃ§Ãµes
     
     ### Passo E ####
     fs=matrix(data = NA, nrow = nrow(data), ncol = 3)    ## Matriz das densidades
     fs[,1]=dnorm(M, coefs[1,1]+S*coefs[1,2], dp[1])
     fs[,2]=dnorm(M, coefs[2,1]+S*coefs[2,2], dp[2])
     fs[,3]=dnorm(M, coefs[3,1]+S*coefs[3,2], dp[3])
-
-    W=sweep(fs, 2, pis0, "*")             ## multiplicação entre fs e pis0
+    
+    W=sweep(fs, 2, pis0, "*")             ## multiplicaÃ§Ã£o entre fs e pis0
     #print(head(W))
     
     W=W/rowSums(W)                       ## Calculando os pesos medios de cada grupo
-   print(head(W))
-    plot(S,M, col=apply(W, 1, which.max), main = it)
+    #print(head(W))
+    #plot(S,M, col=apply(W, 1, which.max), main = it)
     pis0= c(mean(W[,1]), mean(W[,2]), mean(W[,3]))     ## Montar um vetor com os novos pesos medios de cada grupo
-        
+    
     ### Passo M ###
-        
+    
     #fit1 = lm(M~S, data = data, weights = W[,1])   ## regressÃ£o usando os pesos do primeiro grupo
     #fit2 = lm(M~S, data = data, weights = W[,2])   ## regressÃ£o usando os pesos do segundo grupo
     #fit3 = lm(M~S, data = data, weights = W[,3])   ## regressÃ£o usando os pesos do terceiro grupo
-    #abline(fit1)
-    #abline(fit2, col=2)
-    #abline(fit3, col=3)
-    #newcoefs=t(cbind(fit1$coefficients, fit2$coefficients, fit3$coefficients))  ## vetor com os novos coeficientes
     
-    beta1=c((sum(S*M*W[,1])-(sum(S*M*(W[,1]^2))/sum(W[,1])))/(sum(S^2*W[,1])-(sum(S^2*W[,1])/sum(W[,1]))), 0,
-            (sum(S*M*W[,3])-(sum(S*M*(W[,3]^2))/sum(W[,3])))/(sum(S^2*W[,3])-(sum(S^2*W[,3])/sum(W[,3]))))
+    #newcoefs=t(cbind(fit1$coefficients, fit2$coefficients, fit3$coefficients))  
+    
+    beta1=c((sum(S*M*W[,1])-(sum(S*M*(W[,1]^2))/sum(W[,1])))/(sum(S^2*W[,1])-(sum(S^2*W[,1]^2)/sum(W[,1]))),
+            0,
+            (sum(S*M*W[,3])-(sum(S*M*(W[,3]^2))/sum(W[,3])))/(sum(S^2*W[,3])-(sum(S^2*W[,3]^2)/sum(W[,3]))))
     
     alfa1=c((sum(W[,1]*M)-(beta1[1]*sum(W[,1]*S)))/sum(W[,1]),
-             sum(W[,2]*M)/sum(W[,2]),
-             (sum(W[,3]*M)-(beta1[3]*sum(W[,3]*S)))/sum(W[,3]))
+            sum(W[,2]*M)/sum(W[,2]),
+            (sum(W[,3]*M)-(beta1[3]*sum(W[,3]*S)))/sum(W[,3]))
     
-    newcoefs=cbind(alfa1, beta1)
+    coefs=cbind(alfa1, beta1)         ## vetor com os novos coeficientes
     
-    erro = max(abs(coefs-newcoefs))
+    Rq=(M-(cbind(1,S)%*%t(coefs)))^2     ## calculando o residuo ao quadrado
+    dp=sqrt(sum(W*Rq)/sum(W))            ## novos desvios padrões iguais para os 3 grupos
+    dp=rep(dp,3)                  
     
-    coefs = newcoefs                ### substituindo o coefs pelos newcoefs calculados pelas novas regressÃµes
     
-    rm(newcoefs)
+    #abline(alfa1[1],beta1[1])
+    #abline(alfa1[2],beta1[2],col=2)
+    #abline(alfa1[3],beta1[3],col=3)
     
-    dp= c(sqrt(sum(((M-alfa1[1]-(beta1[1]*S))^2))/n),
-          sqrt(sum(((M-alfa1[2]-(beta1[2]*S))^2))/n),
-          sqrt(sum(((M-alfa1[3]-(beta1[3]*S))^2))/n) )       ## novos desvios padrões
+    fs[,1]=dnorm(M, coefs[1,1]+S*coefs[1,2], dp[1])
+    fs[,2]=dnorm(M, coefs[2,1]+S*coefs[2,2], dp[2])
+    fs[,3]=dnorm(M, coefs[3,1]+S*coefs[3,2], dp[3])
+    
+    log_verossimilhanca=sum(W * sweep(log(fs), 2, log(pis0), "+"))   ## calculando a log-verossimilhança
+    
+    mudanca = log_verossimilhanca - llvelho
+    
+    message("antigo:", llvelho)
+    
+    message("novo", log_verossimilhanca)
+    
+    llvelho = log_verossimilhanca
+    
+    if(mudanca<0) stop("verossimilhança diminuiu")
+    
+    print(log_verossimilhanca)
     
     it=it+1
+    
+    print(mudanca>1e-6)
     
   } ##FECHA WHILE    
   return(list(coefs=coefs,W=head(W),pis0=pis0, it))      
 }
-   
+
+
 res=fitEM(M,S)
+res
+
