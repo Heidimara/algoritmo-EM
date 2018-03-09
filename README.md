@@ -4,6 +4,7 @@
 
 
 setwd("C:\\Users\\Computador\\Documents\\Heidi\\Dissertação-Mestrado\\programas no R")  # mudar o diretorio
+
 x=allelesub = load("alleleSub.rda")  # importar o banco de dados
 
   A = alleleAsub  ## conjunto de dados dos alelos A
